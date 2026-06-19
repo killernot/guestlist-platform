@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Event {
+  id           String        @id @default(cuid())
+  name         String
+  date         DateTime
+  venue        String
+  capacity     Int           @default(100)
+  description  String?
+  bannerUrl    String?
+  reservations Reservation[]
+
+  @@map("events")
+}
+
+model Reservation {
+  id         String            @id @default(cuid())
+  code       String            @unique
+  fullName   String
+  mobile     String
+  email      String?
+  instagram  String?
+  guestCount Int               @default(1)
+  status     ReservationStatus @default(PENDING)
+  eventId    String
+  createdAt  DateTime          @default(now())
+  event      Event             @relation(fields: [eventId], references: [id])
+
+  @@map("reservations")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String
+  name         String?
+  passwordHash String
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now())
+
+  @@map("admin_users")
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHECKED_IN
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
