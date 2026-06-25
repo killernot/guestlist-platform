@@ -279,7 +279,21 @@ export default function AdminDashboard({ initialReservations }: { initialReserva
         )}
 
         {/* Export CSV Button */}
-        <button className="mt-6 bg-gray-800 hover:bg-purple-900 text-white px-4 py-2 rounded transition-colors">
+        <button
+          onClick={() => {
+            const headers = ["Code", "Name", "Mobile", "Guests", "Status"];
+            const rows = filtered.map(r => [r.code, r.fullName, r.mobile, r.guestCount, r.status]);
+            const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "reservations.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="btn btn-secondary"
+        >
           Export CSV
         </button>
       </main>

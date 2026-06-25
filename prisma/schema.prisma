@@ -9,15 +9,35 @@ datasource db {
 model Event {
   id           String        @id @default(cuid())
   name         String
-  date         DateTime
-  venue        String
-  capacity     Int           @default(100)
+  slug         String        @unique
   description  String?
+  venue        String
+  address      String?
+  date         DateTime
+  startTime    String?
+  endTime      String?
+  capacity     Int           @default(100)
+  minAge       Int?
+  dressCode    String?
+  genres       String?
+  djLineup     String?
+  coverImage   String?
+  galleryImages String?
+  status       EventStatus   @default(DRAFT)
   bannerUrl    String?
   reservations Reservation[]
+  sheetsMapping GoogleSheetsMapping?
 
   @@index([date])
+  @@index([status])
   @@map("events")
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  COMPLETED
+  ARCHIVED
 }
 
 model Reservation {
@@ -71,8 +91,9 @@ model GoogleSheetsMapping {
   spreadsheetId String
   sheetUrl    String
   sheetTitle  String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  event       Event    @relation(fields: [eventId], references: [id])
 
   @@map("google_sheets_mappings")
 }
