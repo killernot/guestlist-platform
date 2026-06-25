@@ -30,7 +30,6 @@ const handler: NextApiHandler = async (req, res) => {
         take: limitNum,
         include: {
           _count: { select: { reservations: true } },
-          sheetsMapping: { select: { spreadsheetId: true, sheetUrl: true } },
         },
       }),
       prisma.event.count({ where }),
@@ -40,24 +39,24 @@ const handler: NextApiHandler = async (req, res) => {
       events: events.map((e) => ({
         id: e.id,
         name: e.name,
-        slug: e.slug,
+        slug: e.slug || null,
         date: e.date.toISOString(),
-        startTime: e.startTime,
-        endTime: e.endTime,
+        startTime: e.startTime || null,
+        endTime: e.endTime || null,
         venue: e.venue,
-        address: e.address,
+        address: e.address || null,
         capacity: e.capacity,
-        minAge: e.minAge,
-        dressCode: e.dressCode,
-        genres: e.genres,
-        djLineup: e.djLineup,
-        coverImage: e.coverImage,
-        galleryImages: e.galleryImages,
-        status: e.status,
+        minAge: e.minAge || null,
+        dressCode: e.dressCode || null,
+        genres: e.genres || null,
+        djLineup: e.djLineup || null,
+        coverImage: e.coverImage || e.bannerUrl,
+        galleryImages: e.galleryImages || null,
+        status: e.status || "DRAFT",
         description: e.description,
         reservationCount: e._count.reservations,
-        hasSheet: !!e.sheetsMapping,
-        sheetUrl: e.sheetsMapping?.sheetUrl || null,
+        hasSheet: false,
+        sheetUrl: null,
       })),
       pagination: {
         page: pageNum,
@@ -66,8 +65,9 @@ const handler: NextApiHandler = async (req, res) => {
         totalPages: Math.ceil(total / limitNum),
       },
     });
-  } catch {
-    res.status(500).json({ error: "Internal server error" });
+  } catch (err: any) {
+    if (err.code === "P2002") return res.status(409).json({ error: "Unique constraint violation" });
+    return res.status(500).json({ error: "Internal server error", detail: process.env.NODE_ENV === "development" ? String(err) : undefined });
   }
 };
 
