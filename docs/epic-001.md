@@ -65,6 +65,23 @@ Deploy the Guestlist Platform to production and successfully operate the first r
 - **Fix:** Allow `*.vercel.app` domains, derive host from `NEXTAUTH_URL`, support `ALLOWED_HOST` env var override
 - **Re-deploy:** `4Uncmtp4NupcPaa7xfMvayEF7NGc` → https://guestlist-platform-7ef66vfus-risingdead12-4363s-projects.vercel.app
 
+### Maintenance: Bootstrap Cleanup ✅
+
+**Status:** COMPLETED
+**Date:** 2026-06-25
+**Commit:** `0785d37`
+
+- ✅ Temporary `pages/api/bootstrap.ts` endpoint removed
+- ✅ `BOOTSTRAP_TOKEN` env var removed from Vercel
+- ✅ Reusable bootstrap script added at `scripts/bootstrap-admin.ts`
+- ✅ Production redeployed clean (commit `0785d37`)
+- ✅ Authentication verified working on live deployment
+- ✅ Health endpoint: `{"status":"ok"}`
+- ✅ Admin sign-in: HTTP 302 → session active
+- ✅ Bootstrap endpoint: 404 (removed)
+
+---
+
 ### M2: Venue Onboarded
 
 - [ ] Venue details collected (name, capacity, contact)
