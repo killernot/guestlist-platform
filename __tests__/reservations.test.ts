@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
-  reservation: { findUnique: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
-  event: {},
-  adminUser: {},
+  reservation: { findUnique: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), aggregate: vi.fn() },
+  event: { findUnique: vi.fn() },
+  adminUser: { findFirst: vi.fn() },
 }));
 
 vi.mock("../lib/prism", () => ({ default: mockPrisma }));
+vi.mock("next-auth/next", () => ({
+  getServerSession: vi.fn(() => Promise.resolve({ user: { id: "admin1", email: "admin@test.com" } })),
+}));
+vi.mock("../../../auth", () => ({
+  authOptions: {},
+}));
 
 import handler from "../pages/api/reservations/[id]";
 
@@ -17,11 +23,13 @@ function createRes() {
   const res: any = {};
   res.status = vi.fn(() => res);
   res.json = vi.fn(() => res);
+  res.getHeader = vi.fn();
+  res.setHeader = vi.fn();
   return res;
 }
 
 describe("GET /api/reservations/[id]", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => vi.resetAllMocks());
 
   it("returns reservation by id", async () => {
     const reservation = { id: "res1", code: "GL-ABC123", fullName: "Juan", mobile: "0917", status: "PENDING", eventId: "evt1" };
@@ -43,14 +51,17 @@ describe("GET /api/reservations/[id]", () => {
 });
 
 describe("PATCH /api/reservations/[id]", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => vi.resetAllMocks());
 
   it("updates reservation status to APPROVED", async () => {
+    mockPrisma.reservation.findUnique.mockResolvedValue({ id: "res1", eventId: "evt1", guestCount: 2, code: "GL-ABC123" });
+    mockPrisma.event.findUnique.mockResolvedValue({ id: "evt1", capacity: 100 });
+    mockPrisma.reservation.aggregate.mockResolvedValue({ _sum: { guestCount: 0 } });
     mockPrisma.reservation.update.mockResolvedValue({ id: "res1", status: "APPROVED" });
     const req = createReq("PATCH", { id: "res1" }, { status: "APPROVED" });
     const res = createRes();
     await handler(req, res);
-    expect(mockPrisma.reservation.update).toHaveBeenCalledWith({ where: { id: "res1" }, data: { status: "APPROVED" } });
+    expect(mockPrisma.reservation.update).toHaveBeenCalledWith({ where: { id: "res1" }, data: { status: "APPROVED", qrToken: expect.any(String) } });
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
@@ -60,6 +71,7 @@ describe("PATCH /api/reservations/[id]", () => {
     const res = createRes();
     await handler(req, res);
     expect(mockPrisma.reservation.update).toHaveBeenCalledWith({ where: { id: "res1" }, data: { status: "CHECKED_IN" } });
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
   it("returns 400 for invalid status value", async () => {
@@ -89,6 +101,9 @@ describe("PATCH /api/reservations/[id]", () => {
   });
 
   it("re-throws non-P2025 errors", async () => {
+    mockPrisma.reservation.findUnique.mockResolvedValue({ id: "res1", eventId: "evt1", guestCount: 2 });
+    mockPrisma.event.findUnique.mockResolvedValue({ id: "evt1", capacity: 100 });
+    mockPrisma.reservation.aggregate.mockResolvedValue({ _sum: { guestCount: 0 } });
     mockPrisma.reservation.update.mockRejectedValue(new Error("DB connection lost"));
     const req = createReq("PATCH", { id: "res1" }, { status: "APPROVED" });
     const res = createRes();

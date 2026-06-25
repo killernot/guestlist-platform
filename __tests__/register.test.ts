@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
   event: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
-  reservation: { create: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  reservation: { create: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), aggregate: vi.fn() },
   adminUser: { findFirst: vi.fn(), findUnique: vi.fn() },
 }));
 
@@ -17,6 +17,8 @@ function createRes() {
   const res: any = {};
   res.status = vi.fn(() => res);
   res.json = vi.fn(() => res);
+  res.getHeader = vi.fn();
+  res.setHeader = vi.fn();
   return res;
 }
 
@@ -25,6 +27,7 @@ describe("POST /api/register", () => {
 
   it("creates a reservation with valid data", async () => {
     mockPrisma.event.findUnique.mockResolvedValue({ id: "evt1", name: "Test Event", capacity: 100 });
+    mockPrisma.reservation.aggregate.mockResolvedValue({ _sum: { guestCount: 0 } });
     mockPrisma.reservation.create.mockResolvedValue({
       id: "res1", code: "GL-ABC123", fullName: "Juan Dela Cruz",
       mobile: "09171234567", email: "juan@test.com", guestCount: 2,
@@ -61,7 +64,7 @@ describe("POST /api/register", () => {
   });
 
   it("returns 400 when eventId is missing", async () => {
-    const req = createReq({ fullName: "Juan", mobile: "0917" });
+    const req = createReq({ fullName: "Juan", mobile: "09171234567" });
     const res = createRes();
     await POST(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
@@ -70,7 +73,7 @@ describe("POST /api/register", () => {
 
   it("returns 404 when event does not exist", async () => {
     mockPrisma.event.findUnique.mockResolvedValue(null);
-    const req = createReq({ fullName: "Juan", mobile: "0917", eventId: "nonexistent" });
+    const req = createReq({ fullName: "Juan", mobile: "09171234567", eventId: "nonexistent" });
     const res = createRes();
     await POST(req, res);
     expect(res.status).toHaveBeenCalledWith(404);
@@ -86,8 +89,9 @@ describe("POST /api/register", () => {
 
   it("defaults guestCount to 1 when not provided", async () => {
     mockPrisma.event.findUnique.mockResolvedValue({ id: "evt1", name: "Test", capacity: 100 });
+    mockPrisma.reservation.aggregate.mockResolvedValue({ _sum: { guestCount: 0 } });
     mockPrisma.reservation.create.mockResolvedValue({ id: "res1", code: "GL-XYZ", guestCount: 1 } as any);
-    const req = createReq({ fullName: "Juan", mobile: "0917", eventId: "evt1" });
+    const req = createReq({ fullName: "Juan", mobile: "09171234567", eventId: "evt1" });
     const res = createRes();
     await POST(req, res);
     expect(mockPrisma.reservation.create).toHaveBeenCalledWith(

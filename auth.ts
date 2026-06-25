@@ -1,4 +1,4 @@
-import { NextAuth } from "next-auth";
+import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -14,7 +14,7 @@ export const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const user = await prisma.adminUser.findUnique({
+        const user = await prisma.adminUser.findFirst({
           where: { email: credentials.email as string }
         });
 

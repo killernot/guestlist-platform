@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Guestlist Platform
+
+Nightclub guestlist and reservation system for Manila venues. Next.js 16 + Prisma (PostgreSQL/Neon) + NextAuth.
+
+## Features
+
+- **Public Event Browsing** — Guests view upcoming events and make reservations
+- **QR Check-in** — Staff scan QR codes at the door for instant check-in
+- **Admin Dashboard** — Venue staff manage reservations, approve/reject, view analytics
+- **Capacity Management** — Real-time capacity enforcement with guest count validation
+- **Google Sheets Sync** — Automatic reservation sync to Google Sheets
+- **Venue Analytics** — Event attendance, reservation trends, conversion metrics
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (Pages Router)
+- **Database:** PostgreSQL via Neon, Prisma ORM
+- **Auth:** NextAuth (Credentials provider)
+- **Styling:** Tailwind CSS 4
+- **Deployment:** Vercel
+- **Testing:** Vitest (130 tests)
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Clone
+git clone https://github.com/killernot/guestlist-platform.git
+cd guestlist-platform
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your values:
+# - DATABASE_URL (Neon PostgreSQL connection string)
+# - NEXTAUTH_SECRET (generate: python3 -c "import secrets; print(secrets.token_hex(32))")
+# - NEXTAUTH_URL (http://localhost:3000)
+
+# Set up database
+npx prisma migrate deploy
+npx prisma generate
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The project is deployed on Vercel. Pushing to `master` triggers automatic deployment.
 
-## Learn More
+```bash
+# Manual Vercel deployment
+vercel --prod
+```
 
-To learn more about Next.js, take a look at the following resources:
+## API Routes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Route | Method | Auth | Description |
+|-------|--------|------|-------------|
+| `/api/events` | GET | Public | List events |
+| `/api/events` | POST | Admin | Create event |
+| `/api/events/[id]` | GET | Public | Get event details |
+| `api/events/[id]/update` | PUT | Admin | Update event |
+| `api/events/[id]/delete` | DELETE | Admin | Delete event |
+| `/api/register` | POST | Public | User registration |
+| `/api/reservations` | GET | Admin | List reservations |
+| `/api/reservations/[id]` | PATCH | Admin | Update reservation status |
+| `/api/checkin/scanner` | POST | Admin | QR scanner endpoint |
+| `/api/checkin/verify` | POST | Admin | Verify QR token |
+| `/api/sheets/sync` | POST | Admin | Trigger Google Sheets sync |
+| `/api/analytics/dashboard` | GET | Admin | Dashboard metrics |
+| `/api/health` | GET | Public | Health check |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment Variables
 
-## Deploy on Vercel
+See `.env.example` for all required variables.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Testing
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm test          # Run all tests (130 tests)
+npm run test:coverage  # With coverage report
+```
+
+## License
+
+MIT

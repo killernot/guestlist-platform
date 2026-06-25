@@ -2,6 +2,6 @@ import { defineConfig } from "@prisma/config";
 
 export default defineConfig({
   datasource: {
-    url: process.env.DATABASE_URL || "postgresql://guestlist:guestlist@localhost:5432/guestlist",
+    url: process.env.DATABASE_URL || "postgresql://guestlist:***@localhost:5432/guestlist?connection_limit=10",
   },
 });

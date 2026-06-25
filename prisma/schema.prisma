@@ -16,28 +16,35 @@ model Event {
   bannerUrl    String?
   reservations Reservation[]
 
+  @@index([date])
   @@map("events")
 }
 
 model Reservation {
-  id         String            @id @default(cuid())
-  code       String            @unique
-  fullName   String
-  mobile     String
-  email      String?
-  instagram  String?
-  guestCount Int               @default(1)
-  status     ReservationStatus @default(PENDING)
-  eventId    String
-  createdAt  DateTime          @default(now())
-  event      Event             @relation(fields: [eventId], references: [id])
+  id          String            @id @default(cuid())
+  code        String            @unique
+  fullName    String
+  mobile      String
+  email       String?
+  instagram   String?
+  guestCount  Int               @default(1)
+  status      ReservationStatus @default(PENDING)
+  eventId     String
+  createdAt   DateTime          @default(now())
+  qrToken     String?           @unique
+  checkedInAt DateTime?
+  checkedBy   String?
+  event       Event             @relation(fields: [eventId], references: [id])
 
+  @@index([eventId])
+  @@index([status])
+  @@index([status, createdAt])
   @@map("reservations")
 }
 
 model AdminUser {
   id           String   @id @default(cuid())
-  email        String
+  email        String   @unique
   name         String?
   passwordHash String
   role         Role     @default(STAFF)
@@ -56,4 +63,16 @@ enum ReservationStatus {
 enum Role {
   ADMIN
   STAFF
+}
+
+model GoogleSheetsMapping {
+  id          String   @id @default(cuid())
+  eventId     String   @unique
+  spreadsheetId String
+  sheetUrl    String
+  sheetTitle  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("google_sheets_mappings")
 }

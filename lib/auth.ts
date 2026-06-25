@@ -1,12 +1,6 @@
 import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth";
 
-export function getSession() {
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret) {
-    throw new Error("NEXTAUTH_SECRET is not set. Check your .env file.");
-  }
-  return getServerSession({
-    providers: [],
-    secret
-  });
+export async function getSession(req?: any, res?: any) {
+  return getServerSession(req, res, authOptions);
 }

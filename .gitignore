@@ -47,3 +47,12 @@ next-env.d.ts
 
 # temporary test files
 _pgtest.js
+
+# broken/backup directories
+.next.old_broken/
+node_modules_old/
+
+# temp files
+audit-findings.json
+PROJECT_STATE.md
+cron_d8c52258ac11_20260620_082107

@@ -16,10 +16,12 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./lib/*"],
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/styles/*": ["./src/styles/*"],
       "@/lib/*": ["./lib/*"]
     }
   },
-  "include": ["pages", "lib", "types.d.ts"],
+  "include": ["pages", "lib", "src", "components", "types.d.ts"],
   "exclude": ["node_modules"]
 }
