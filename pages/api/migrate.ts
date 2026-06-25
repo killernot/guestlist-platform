@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const result = execSync("npx prisma migrate deploy", {
+    const result = execSync("./node_modules/.bin/prisma migrate deploy", {
       cwd: process.cwd(),
       env: process.env,
       encoding: "utf-8",
