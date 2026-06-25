@@ -1,9 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
 
 /**
  * ONE-TIME MIGRATION ENDPOINT
- * Executes raw SQL to add missing columns.
+ * Executes raw SQL via pg directly.
  * Protected by MIGRATION_TOKEN env var.
  * Remove this file immediately after use.
  */
@@ -22,22 +21,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "DATABASE_URL not set" });
   }
 
-  const prisma = new PrismaClient();
+  // Dynamic import to avoid bundling issues
+  const { Pool } = await import("pg");
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  const results: string[] = [];
 
   try {
-    const results: string[] = [];
-
-    // Check and add EventStatus enum
-    await prisma.$executeRawUnsafe(`
+    // Create EventStatus enum
+    await pool.query(`
       DO $$ BEGIN
         CREATE TYPE "EventStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'COMPLETED', 'ARCHIVED');
       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     `);
     results.push("EventStatus enum created/verified");
 
-    // Add columns to events table
+    // Add columns
     const columns = [
-      { name: "slug", type: "TEXT", constraint: "UNIQUE" },
+      { name: "slug", type: "TEXT" },
       { name: "address", type: "TEXT" },
       { name: "startTime", type: "TEXT" },
       { name: "endTime", type: "TEXT" },
@@ -52,85 +53,72 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     for (const col of columns) {
       try {
-        if (col.name === "status") {
-          await prisma.$executeRawUnsafe(
-            `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "status" "EventStatus" NOT NULL DEFAULT 'DRAFT'`
-          );
-        } else if (col.constraint === "UNIQUE") {
-          await prisma.$executeRawUnsafe(
-            `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}`
+        if (col.default) {
+          await pool.query(
+            `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type} NOT NULL ${col.default}`
           );
         } else {
-          await prisma.$executeRawUnsafe(
+          await pool.query(
             `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}`
           );
         }
         results.push(`Column ${col.name} added/verified`);
       } catch (e: any) {
-        if (e.message?.includes("already exists")) {
-          results.push(`Column ${col.name} already exists`);
-        } else {
-          results.push(`Column ${col.name} ERROR: ${e.message}`);
-        }
+        results.push(`Column ${col.name}: ${e.message?.includes("already exists") ? "already exists" : e.message}`);
       }
     }
 
-    // Add unique index on slug
+    // Unique index on slug
     try {
-      await prisma.$executeRawUnsafe(
-        `CREATE UNIQUE INDEX IF NOT EXISTS "events_slug_key" ON "events"("slug")`
-      );
-      results.push("Unique index on slug created/verified");
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "events_slug_key" ON "events"("slug")`);
+      results.push("Slug unique index created/verified");
     } catch {
       results.push("Slug index already exists");
     }
 
-    // Add index on status
+    // Status index
     try {
-      await prisma.$executeRawUnsafe(
-        `CREATE INDEX IF NOT EXISTS "events_status_idx" ON "events"("status")`
-      );
-      results.push("Index on status created/verified");
+      await pool.query(`CREATE INDEX IF NOT EXISTS "events_status_idx" ON "events"("status")`);
+      results.push("Status index created/verified");
     } catch {
       results.push("Status index already exists");
     }
 
-    // Backfill slugs for existing events
+    // Backfill slugs
     try {
-      await prisma.$executeRawUnsafe(`
+      await pool.query(`
         UPDATE "events" SET "slug" = lower(regexp_replace("name", '[^a-z0-9]+', '-', 'g'))
         WHERE "slug" IS NULL OR "slug" = ''
       `);
-      results.push("Backfilled slugs for existing events");
+      results.push("Backfilled slugs");
     } catch (e: any) {
-      results.push(`Slug backfill skipped: ${e.message}`);
+      results.push(`Slug backfill: ${e.message}`);
     }
 
     // Set existing events to PUBLISHED
     try {
-      await prisma.$executeRawUnsafe(
-        `UPDATE "events" SET "status" = 'PUBLISHED' WHERE "status" = 'DRAFT'`
-      );
-      results.push("Set existing events to PUBLISHED");
-    } catch {
-      results.push("Status update skipped");
+      await pool.query(`UPDATE "events" SET "status" = 'PUBLISHED' WHERE "status" = 'DRAFT'`);
+      results.push("Existing events set to PUBLISHED");
+    } catch (e: any) {
+      results.push(`Status update: ${e.message}`);
     }
 
-    // Add event relation to google_sheets_mappings
+    // Add FK to google_sheets_mappings
     try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE "google_sheets_mappings" ADD CONSTRAINT IF NOT EXISTS "google_sheets_mappings_eventId_fkey"
-         FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE ON UPDATE CASCADE`
-      );
-      results.push("GoogleSheetsMapping event relation created/verified");
+      await pool.query(`
+        ALTER TABLE "google_sheets_mappings" DROP CONSTRAINT IF EXISTS "google_sheets_mappings_eventId_fkey";
+        ALTER TABLE "google_sheets_mappings" ADD CONSTRAINT "google_sheets_mappings_eventId_fkey"
+        FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      `);
+      results.push("Sheets mapping FK created/verified");
     } catch {
-      results.push("Sheets relation already exists or not applicable");
+      results.push("Sheets FK already exists or N/A");
     }
 
-    await prisma.$disconnect();
+    await pool.end();
     return res.json({ success: true, results });
   } catch (err: any) {
-    await prisma.$disconnect();
-    return res.status(500).json({ error: "Migration failed", detail: err.message });
+    await pool.end();
+    return res.status(500).json({ error: "Migration failed", detail: err.message, results });
   }
 }

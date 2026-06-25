@@ -22,21 +22,50 @@ const handler: NextApiHandler = async (req, res) => {
     const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 50));
 
-    const [events, total] = await Promise.all([
-      prisma.event.findMany({
-        where,
-        orderBy: { date: "desc" },
-        skip: (pageNum - 1) * limitNum,
-        take: limitNum,
-        include: {
-          _count: { select: { reservations: true } },
-        },
-      }),
-      prisma.event.count({ where }),
-    ]);
+    let events: any[] = [];
+    let total = 0;
+
+    try {
+      const [foundEvents, count] = await Promise.all([
+        prisma.event.findMany({
+          where,
+          orderBy: { date: "desc" },
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+          include: {
+            _count: { select: { reservations: true } },
+          },
+        }),
+        prisma.event.count({ where }),
+      ]);
+      events = foundEvents;
+      total = count;
+    } catch (queryErr: any) {
+      // Fallback: query without new columns if schema is behind
+      if (queryErr.message?.includes("Unknown column") || queryErr.code === "P2022") {
+        const fallback = await prisma.event.findMany({
+          where: search ? {
+            OR: [
+              { name: { contains: String(search), mode: "insensitive" } },
+              { venue: { contains: String(search), mode: "insensitive" } },
+            ],
+          } : {},
+          orderBy: { date: "desc" },
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+          include: {
+            _count: { select: { reservations: true } },
+          },
+        });
+        events = fallback;
+        total = fallback.length;
+      } else {
+        throw queryErr;
+      }
+    }
 
     res.json({
-      events: events.map((e) => ({
+      events: events.map((e: any) => ({
         id: e.id,
         name: e.name,
         slug: e.slug || null,
@@ -54,7 +83,7 @@ const handler: NextApiHandler = async (req, res) => {
         galleryImages: e.galleryImages || null,
         status: e.status || "DRAFT",
         description: e.description,
-        reservationCount: e._count.reservations,
+        reservationCount: e._count?.reservations || 0,
         hasSheet: false,
         sheetUrl: null,
       })),
@@ -66,8 +95,10 @@ const handler: NextApiHandler = async (req, res) => {
       },
     });
   } catch (err: any) {
-    if (err.code === "P2002") return res.status(409).json({ error: "Unique constraint violation" });
-    return res.status(500).json({ error: "Internal server error", detail: process.env.NODE_ENV === "development" ? String(err) : undefined });
+    return res.status(500).json({
+      error: "Internal server error",
+      detail: process.env.NODE_ENV === "development" ? String(err) : undefined,
+    });
   }
 };
 
