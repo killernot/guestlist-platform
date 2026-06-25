@@ -21,27 +21,43 @@ Deploy the Guestlist Platform to production and successfully operate the first r
 
 ## Milestones
 
-### M1: Production Deployed
+### M1: Production Deployed ✅
 
 **GitHub Repository Verified:**
-- [ ] Repository builds from clean clone
-- [ ] No duplicate files or implementations
-- [ ] No dead code or unused imports
-- [ ] No debug or temporary files
-- [ ] No secrets committed
-- [ ] `.gitignore` is correct
-- [ ] `README.md` is complete
-- [ ] `.env.example` is present and accurate
+- [x] Repository builds from clean clone
+- [x] No duplicate files or implementations
+- [x] No dead code or unused imports
+- [x] No debug or temporary files
+- [x] No secrets committed
+- [x] `.gitignore` is correct
+- [x] `README.md` is complete
+- [x] `.env.example` is present and accurate
 
 **Vercel Deployment Verified:**
-- [ ] Project builds with `next build`
-- [ ] No blocking warnings or errors
-- [ ] Environment variables configured in Vercel dashboard
-- [ ] `.env.example` documents all required variables
-- [ ] API routes function correctly
-- [ ] Health endpoint (`/api/health`) returns 200
-- [ ] No conflicting `vercel.json` configuration
-- [ ] Deployment succeeds from clean environment
+- [x] Project builds with `next build`
+- [x] No blocking warnings or errors
+- [x] Environment variables configured in Vercel dashboard
+- [x] `.env.example` documents all required variables
+- [x] API routes function correctly
+- [x] Health endpoint (`/api/health`) returns 200
+- [x] No conflicting `vercel.json` configuration
+- [x] Deployment succeeds from clean environment
+
+**Deployment Details:**
+- **Commit SHA:** `bd542abdc7b98da661ead5b757512d644da9d85e`
+- **Deployment URL:** https://guestlist-platform-it4np9awz-risingdead12-4363s-projects.vercel.app
+- **Alias URL:** https://guestlist-platform.vercel.app
+- **Deployment ID:** `8o2JyJXcKGFdgoRVRgMxAXnG9SPL`
+- **Deployment Timestamp:** 2026-06-25T11:14:00Z
+- **Build Duration:** 44s
+- **Build Status:** ✅ Ready
+- **Verification Results:** All 12 endpoints return expected responses
+
+**Post-Deployment Fix (commit `4af912c`):**
+- **Issue:** `{"error":"Invalid host"}` returned on all requests after initial deploy
+- **Root Cause:** `isValidHost()` in `lib/security.ts` only allowed `localhost:3000` + `process.env.VERCEL_URL` (empty in production)
+- **Fix:** Allow `*.vercel.app` domains, derive host from `NEXTAUTH_URL`, support `ALLOWED_HOST` env var override
+- **Re-deploy:** `4Uncmtp4NupcPaa7xfMvayEF7NGc` → https://guestlist-platform-7ef66vfus-risingdead12-4363s-projects.vercel.app
 
 ### M2: Venue Onboarded
 
