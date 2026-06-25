@@ -1,6 +1,12 @@
 # Guestlist Platform
 
+**Status: Production Ready | Pilot Ready**
+
 Nightclub guestlist and reservation system for Manila venues. Next.js 16 + Prisma (PostgreSQL/Neon) + NextAuth.
+
+**Production URL:** https://guestlist-platform.vercel.app
+**Version:** v1.0.0
+**Released:** 2026-06-25
 
 ## Features
 

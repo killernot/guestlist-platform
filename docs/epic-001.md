@@ -23,6 +23,12 @@ Deploy the Guestlist Platform to production and successfully operate the first r
 
 ### M1: Production Deployed ✅
 
+**Status:** COMPLETED
+**Release:** v1.0.0
+**Commit SHA:** `a8278b3`
+**Deployment URL:** https://guestlist-platform.vercel.app
+**Release Notes:** [docs/releases/v1.0.0-pilot-release.md](../releases/v1.0.0-pilot-release.md)
+
 **GitHub Repository Verified:**
 - [x] Repository builds from clean clone
 - [x] No duplicate files or implementations
