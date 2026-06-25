@@ -59,11 +59,38 @@ The `docker-compose.yml` includes:
 1. Push to GitHub
 2. Import repo in Vercel
 3. Set environment variables:
-   - `DATABASE_URL` = `postgresql://user:pass@host:5432/guestlist?schema=public`
+   - `DATABASE_URL` = `postgresql://user:***@host:5432/guestlist?schema=public`
    - `NEXTAUTH_SECRET` = random hex string
    - `NEXTAUTH_URL` = your Vercel URL
 4. Build command: `npm run build`
 5. Output directory: `.next`
+6. **After deployment:** Apply pending migrations (see below)
+
+## Production Migrations
+
+### Neon SQL Editor (Recommended)
+
+1. Log into https://neon.tech → SQL Editor
+2. Connect to `guestlist` database
+3. Paste SQL from `prisma/migrations/<timestamp>_<name>/migration.sql`
+4. Execute
+5. Verify: `SELECT * FROM "_prisma_migrations" ORDER BY "finished_at" DESC LIMIT 5;`
+
+### CLI (if DATABASE_URL is accessible)
+
+```bash
+DATABASE_URL="postgresql://..." npx prisma migrate deploy
+```
+
+### Mandatory Gate
+
+**Production schema MUST match the deployed Prisma schema before a feature is marked Done.**
+
+Verify with:
+```bash
+npx prisma migrate status
+# Should show: "Database schema is up to date"
+```
 
 ## PostgreSQL Migration (SQLite → PostgreSQL)
 
