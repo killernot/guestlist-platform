@@ -47,15 +47,38 @@ function isValidHost(request: NextRequest): boolean {
   const host = request.headers.get("host");
   if (!host) return true;
 
-  const allowedHosts = [
-    "localhost:3000",
-    process.env.VERCEL_URL || null,
-    process.env.ALLOWED_HOST || null,
-  ].filter(Boolean);
+  // Build allowlist from explicit env vars + auto-detect Vercel + localhost
+  const allowedHosts = new Set<string>();
 
-  return allowedHosts.some(
-    (allowed) => allowed && host.toLowerCase() === allowed.toLowerCase()
-  );
+  // Local development
+  allowedHosts.add("localhost:3000");
+  allowedHosts.add("127.0.0.1:3000");
+
+  // Explicit overrides
+  if (process.env.ALLOWED_HOST) {
+    allowedHosts.add(process.env.ALLOWED_HOST.toLowerCase());
+  }
+  if (process.env.VERCEL_URL) {
+    allowedHosts.add(process.env.VERCEL_URL.toLowerCase());
+  }
+
+  // Derive hostname from NEXTAUTH_URL (always set on Vercel)
+  if (process.env.NEXTAUTH_URL) {
+    try {
+      const nexthAuthHost = new URL(process.env.NEXTAUTH_URL).host;
+      allowedHosts.add(nexthAuthHost.toLowerCase());
+    } catch {
+      // Invalid NEXTAUTH_URL — skip
+    }
+  }
+
+  // Allow all Vercel app domains (preview + production auto-generated URLs)
+  const normalizedHost = host.toLowerCase();
+  if (normalizedHost.endsWith(".vercel.app")) {
+    return true;
+  }
+
+  return allowedHosts.has(normalizedHost);
 }
 
 /* ---- Middleware ---- */
