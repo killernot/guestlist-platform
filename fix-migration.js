@@ -3,7 +3,9 @@
  * Fixes the broken migration state in production.
  * Safe to run multiple times (idempotent).
  */
-const { PrismaClient } = require('./node_modules/@prisma/client');
+// Use full path to ensure module resolution works in Vercel build environment
+const prismaPkg = require.resolve('@prisma/client', { paths: [__dirname] });
+const { PrismaClient } = require(prismaPkg);
 
 const prisma = new PrismaClient();
 
