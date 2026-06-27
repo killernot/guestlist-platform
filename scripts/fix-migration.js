@@ -42,7 +42,7 @@ async function main() {
   const tableExists = check.output?.includes('google_sheets_mappings');
 
   if (!tableExists) {
-    console.log('\n--- Creating google_sheets_mappings table ---');
+    console.log('\n--- Creating google_sheets_mappings table (WITHOUT FK, migration 3 will add it) ---');
     const create = run(
       'npx prisma db execute --stdin',
       `CREATE TABLE "google_sheets_mappings" (
@@ -55,15 +55,14 @@ async function main() {
         "updatedAt" TIMESTAMP(3) NOT NULL,
         CONSTRAINT "google_sheets_mappings_pkey" PRIMARY KEY ("id")
       );
-      CREATE UNIQUE INDEX "google_sheets_mappings_eventId_key" ON "google_sheets_mappings"("eventId");
-      ALTER TABLE "google_sheets_mappings" ADD CONSTRAINT "google_sheets_mappings_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE RESTRICT ON UPDATE CASCADE;`
+      CREATE UNIQUE INDEX "google_sheets_mappings_eventId_key" ON "google_sheets_mappings"("eventId");`
     );
     
     if (!create.success) {
       console.error('Failed to create table:', create.error?.message?.split('\n')[0]);
       process.exit(1);
     }
-    console.log('✅ Table created successfully');
+    console.log('✅ Table created successfully (without FK constraint)');
   } else {
     console.log('✅ Table already exists');
   }
@@ -79,10 +78,10 @@ async function main() {
   if (deploy.success && !deploy.output?.includes('Error')) {
     console.log('\n✅ All migrations deployed successfully!');
   } else {
-    console.log('\n⚠️  Migration deploy had issues. Check output above.');
+    console.log('\n⚠️  Migration deploy had issues. Checking status...');
   }
 
-  // Step 4: Verify status
+  // Step 4: Verify final status
   console.log('\n--- Final status ---');
   run('npx prisma migrate status 2>&1');
 }
