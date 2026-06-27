@@ -65,6 +65,38 @@ async function main() {
     console.log('✅ Table created successfully (without FK constraint)');
   } else {
     console.log('✅ Table already exists');
+    
+    // Check if FK constraint exists
+    const fkCheck = run(
+      'npx prisma db execute --stdin',
+      `SELECT constraint_name FROM information_schema.table_constraints 
+       WHERE table_name = 'google_sheets_mappings' AND constraint_type = 'FOREIGN KEY';`
+    );
+    
+    const fkExists = fkCheck.output?.includes('google_sheets_mappings_eventId_fkey');
+    
+    if (fkExists) {
+      console.log('⚠️ FK constraint already exists — table was created with FK.');
+      console.log('Migration 3 (add FK) will fail. Marking it as applied directly...');
+      
+      // Mark migration 3 as applied since the FK already exists
+      run(
+        'npx prisma db execute --stdin',
+        `UPDATE "_prisma_migrations" 
+         SET "finished_at" = NOW(), "applied_steps_count" = 1, "rolled_back_at" = NULL, "logs" = NULL
+         WHERE "migration_name" = '20260625000001_add_sheets_relation';`
+      );
+      
+      // Now just deploy migration 4
+      console.log('\n--- Deploying remaining migrations ---');
+      run('npx prisma migrate deploy 2>&1');
+      
+      console.log('\n--- Final status ---');
+      run('npx prisma migrate status 2>&1');
+      
+      console.log('\n✅ Recovery complete!');
+      process.exit(0);
+    }
   }
 
   // Step 2: Mark the failed migration as rolled back
