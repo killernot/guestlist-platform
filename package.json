@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "postinstall": "prisma generate && patch-package",
-    "vercel-build": "prisma generate && node scripts/fix-migration.js && next build",
+    "vercel-build": "prisma generate && node fix-migration.js && next build",
     "db:status": "prisma migrate status",
     "db:check": "prisma migrate status | grep -q 'Database schema is up to date' || (echo 'Migrations pending!' && exit 1)"
   },

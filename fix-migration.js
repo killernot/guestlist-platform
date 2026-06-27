@@ -3,7 +3,7 @@
  * Fixes the broken migration state in production.
  * Safe to run multiple times (idempotent).
  */
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require('./node_modules/@prisma/client');
 
 const prisma = new PrismaClient();
 
