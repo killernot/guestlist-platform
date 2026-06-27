@@ -681,21 +681,21 @@ export const getServerSideProps = async (context: { params: { slug: string } }) 
     const event = await prisma.event.findFirst({
       where: {
         OR: [
+          { slug },
           { id: slug },
-          { name: { contains: slug.replace(/-/g, " ") } },
         ],
-      },
-      include: {
-        reservations: {
-          where: { status: "APPROVED" },
-          select: { id: true },
-        },
       },
     });
 
     if (!event) {
       return { notFound: true };
     }
+
+    // Use SUM(guestCount) for accurate capacity usage — not COUNT(rows)
+    const approvedAgg = await prisma.reservation.aggregate({
+      where: { eventId: event.id, status: "APPROVED" },
+      _sum: { guestCount: true },
+    });
 
     return {
       props: {
@@ -707,7 +707,7 @@ export const getServerSideProps = async (context: { params: { slug: string } }) 
           capacity: event.capacity,
           description: event.description,
           bannerUrl: event.bannerUrl,
-          approvedCount: event.reservations.length,
+          approvedCount: approvedAgg._sum.guestCount ?? 0,
         },
       },
     };

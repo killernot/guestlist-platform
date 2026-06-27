@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect } from "react";
 interface Event {
   id: string;
   name: string;
+  slug: string;
   date: string;
   venue: string;
   capacity: number;
@@ -59,7 +60,7 @@ function EventCard({ event }: { event: Event }) {
 
   return (
     <Link
-      href={`/events/${event.id}`}
+      href={`/events/${event.slug || event.id}`}
       className="group block overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-neon-orange)]/30 hover:shadow-[0_0_16px_rgba(232,122,36,0.1)]"
     >
       {/* Image */}
@@ -308,10 +309,16 @@ export default function EventsPage({ events }: EventsPageProps) {
 export const getServerSideProps = async () => {
   try {
     const { default: prisma } = await import("../../lib/prism");
-
     const events = await prisma.event.findMany({
+      where: { date: { gte: new Date() } },
       orderBy: { date: "asc" },
       take: 50,
+      include: {
+        reservations: {
+          where: { status: "APPROVED" },
+          select: { guestCount: true },
+        },
+      },
     });
 
     return {
@@ -319,12 +326,13 @@ export const getServerSideProps = async () => {
         events: events.map((e) => ({
           id: e.id,
           name: e.name,
-          slug: e.name.toLowerCase().replace(/\s+/g, "-"),
+          slug: e.slug || e.name.toLowerCase().replace(/\s+/g, "-"),
           date: e.date.toISOString(),
           venue: e.venue,
           capacity: e.capacity,
           description: e.description,
           bannerUrl: e.bannerUrl,
+          reservations: e.reservations?.map((r: any) => ({ guestCount: r.guestCount })) ?? [],
         })),
       },
     };

@@ -1,18 +1,18 @@
 import { NextApiHandler } from "next";
-import { getEventById } from "../../../lib/events";
+import { getEventBySlug } from "../../../../lib/events";
 
 const handler: NextApiHandler = async (req, res) => {
   try {
-    const { id } = req.query;
-    if (typeof id !== "string") {
-      return res.status(400).json({ error: "Invalid event ID" });
-    }
-
     if (req.method !== "GET") {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const event = await getEventById(id);
+    const { slug } = req.query;
+    if (typeof slug !== "string") {
+      return res.status(400).json({ error: "Invalid slug" });
+    }
+
+    const event = await getEventBySlug(slug);
 
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
@@ -20,7 +20,7 @@ const handler: NextApiHandler = async (req, res) => {
 
     return res.json(event);
   } catch {
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 

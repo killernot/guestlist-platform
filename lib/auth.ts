@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth";
-
-export async function getSession(req?: any, res?: any) {
-  return getServerSession(req, res, authOptions);
-}
+/**
+ * @deprecated Use getServerSession from "../auth" instead.
+ * This file is kept for reference but exports nothing.
+ */
+// All auth logic moved to root auth.ts with Auth.js v5 API.

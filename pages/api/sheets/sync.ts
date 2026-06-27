@@ -8,8 +8,7 @@
  */
 
 import { NextApiHandler } from "next";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../auth";
+import { getServerSession } from "../../../auth";
 import prisma from "../../../lib/prism";
 import {
   createEventSheet,
@@ -21,7 +20,7 @@ import { isGoogleSheetsConfigured } from "../../../lib/google-sheets-config";
 
 const handler: NextApiHandler = async (req, res) => {
   // Auth check
-  const session = await getServerSession(req, res, authOptions);
+  const session = await getServerSession(req, res);
   if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
   }

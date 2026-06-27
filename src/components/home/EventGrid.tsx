@@ -15,6 +15,7 @@ interface EventGridProps {
     capacity: number;
     bannerUrl?: string | null;
     description?: string | null;
+    reservations?: { guestCount: number }[];
   }>;
   isLoading?: boolean;
 }
@@ -101,7 +102,7 @@ export default function EventGrid({
               startDate={event.date}
               coverImage={event.bannerUrl ?? null}
               capacity={event.capacity}
-              reservations={[]}
+              reservations={event.reservations ?? []}
             />
           ))}
         </div>

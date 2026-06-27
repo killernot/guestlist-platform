@@ -1,6 +1,4 @@
 import { NextApiHandler } from "next";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../auth";
 import prisma from "../../../lib/prism";
 import { verifyQrToken } from "../../../lib/qr-token";
 

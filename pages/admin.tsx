@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth";
+import { getServerSession } from "../auth";
 import prisma from "../lib/prism";
 
 interface Reservation {
@@ -19,7 +18,7 @@ const STATUS_OPTIONS = ["ALL", "PENDING", "APPROVED", "REJECTED", "CHECKED_IN"] 
 type StatusFilter = (typeof STATUS_OPTIONS)[number];
 
 export async function getServerSideProps(context: any) {
-  const session = await getServerSession(context.req, context.res, authOptions);
+  const session = await getServerSession(context.req, context.res);
 
   if (!session) {
     return {

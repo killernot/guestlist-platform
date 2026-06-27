@@ -12,6 +12,7 @@ import CTASection from "../src/components/home/CTASection";
 interface Event {
   id: string;
   name: string;
+  slug: string;
   date: string;
   venue: string;
   capacity: number;
@@ -36,6 +37,12 @@ export async function getServerSideProps() {
         orderBy: { date: "asc" },
         where: { date: { gte: new Date() } },
         take: 6,
+        include: {
+          reservations: {
+            where: { status: "APPROVED" },
+            select: { guestCount: true },
+          },
+        },
       }),
       prisma.event.count(),
       prisma.reservation.count(),
@@ -46,11 +53,13 @@ export async function getServerSideProps() {
         events: events.map((e) => ({
           id: e.id,
           name: e.name,
+          slug: e.slug,
           date: e.date.toISOString(),
           venue: e.venue,
           capacity: e.capacity,
           bannerUrl: e.bannerUrl ?? null,
           description: e.description ?? null,
+          reservations: e.reservations?.map((r: any) => ({ guestCount: r.guestCount })) ?? [],
         })),
         stats: {
           totalEvents,
@@ -183,7 +192,7 @@ function FeaturedPreview({ events }: { events: Event[] }) {
           {events.slice(0, 6).map((event) => (
             <Link
               key={event.id}
-              href={`/events/${event.id}`}
+              href={`/events/${event.slug || event.id}`}
               className="group flex items-center gap-4 rounded-[var(--radius-card)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)]/60 p-4 backdrop-blur-sm transition-all duration-300 hover:border-[var(--color-neon-orange)]/30 hover:bg-[var(--color-bg-surface)] hover:shadow-[0_0_16px_rgba(232,122,36,0.1)]"
             >
               {/* Date badge */}

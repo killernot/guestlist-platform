@@ -10,7 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && patch-package",
     "vercel-build": "prisma generate && next build"
   },
   "dependencies": {
@@ -21,7 +21,7 @@
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
-    "next-auth": "^4.24.14",
+    "next-auth": "^5.0.0-beta.31",
     "pg": "^8.21.0",
     "prisma": "^7.8.0",
     "qrcode.react": "^4.2.0",
@@ -42,6 +42,7 @@
     "eslint-config-next": "16.2.7",
     "jsdom": "^29.1.1",
     "nodemailer": "^7.0.13",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.9"

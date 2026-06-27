@@ -4,8 +4,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../auth";
+import { getServerSession } from "../../../auth";
 import Layout from "../../../src/components/layout/Layout";
 
 interface EventItem {
@@ -38,7 +37,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export async function getServerSideProps(context: any) {
-  const session = await getServerSession(context.req, context.res, authOptions);
+  const session = await getServerSession(context.req, context.res);
   if (!session) {
     return { redirect: { destination: "/admin/login", permanent: false } };
   }

@@ -1,6 +1,5 @@
 import { NextApiHandler } from "next";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../auth";
+import { getServerSession } from "../../../auth";
 import prisma from "../../../lib/prism";
 import { hasCapacity } from "../../../lib/capacity";
 import { updateReservationStatus as syncStatusUpdate, syncCheckIn } from "../../../lib/google-sheets";
@@ -8,7 +7,7 @@ import { isGoogleSheetsConfigured } from "../../../lib/google-sheets-config";
 import { generateQrToken } from "../../../lib/qr-token";
 
 const handler: NextApiHandler = async (req, res) => {
-  const session = await getServerSession(req, res, authOptions);
+  const session = await getServerSession(req, res);
   if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
   }

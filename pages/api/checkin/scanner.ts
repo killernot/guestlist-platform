@@ -1,6 +1,5 @@
 import { NextApiHandler } from "next";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../auth";
+import { getServerSession } from "../../../auth";
 import prisma from "../../../lib/prism";
 
 const handler: NextApiHandler = async (req, res) => {
@@ -9,13 +8,13 @@ const handler: NextApiHandler = async (req, res) => {
   }
 
   // Admin auth required
-  const session = await getServerSession(req, res, authOptions);
+  const session = await getServerSession(req, res);
   if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   // Check if user has admin or staff role
-  const userRole = session.user?.role;
+  const userRole = session.user.role;
   if (userRole !== "ADMIN" && userRole !== "STAFF") {
     return res.status(403).json({ error: "Forbidden" });
   }

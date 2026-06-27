@@ -1,5 +1,5 @@
 import { NextApiHandler } from "next";
-import prisma from "../../../lib/prism";
+import { getEventList } from "../../../lib/events";
 
 const handler: NextApiHandler = async (req, res) => {
   try {
@@ -7,93 +7,18 @@ const handler: NextApiHandler = async (req, res) => {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const { status, venue, search, page = "1", limit = "50" } = req.query;
+    const { status, venue, search, page = "1", limit = "50", upcoming } = req.query;
 
-    const where: any = {};
-    if (status && status !== "ALL") where.status = status;
-    if (venue && venue !== "ALL") where.venue = venue;
-    if (search) {
-      where.OR = [
-        { name: { contains: String(search), mode: "insensitive" } },
-        { venue: { contains: String(search), mode: "insensitive" } },
-      ];
-    }
-
-    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 50));
-
-    let events: any[] = [];
-    let total = 0;
-
-    try {
-      const [foundEvents, count] = await Promise.all([
-        prisma.event.findMany({
-          where,
-          orderBy: { date: "desc" },
-          skip: (pageNum - 1) * limitNum,
-          take: limitNum,
-          include: {
-            _count: { select: { reservations: true } },
-          },
-        }),
-        prisma.event.count({ where }),
-      ]);
-      events = foundEvents;
-      total = count;
-    } catch (queryErr: any) {
-      // Fallback: query without new columns if schema is behind
-      if (queryErr.message?.includes("Unknown column") || queryErr.code === "P2022") {
-        const fallback = await prisma.event.findMany({
-          where: search ? {
-            OR: [
-              { name: { contains: String(search), mode: "insensitive" } },
-              { venue: { contains: String(search), mode: "insensitive" } },
-            ],
-          } : {},
-          orderBy: { date: "desc" },
-          skip: (pageNum - 1) * limitNum,
-          take: limitNum,
-          include: {
-            _count: { select: { reservations: true } },
-          },
-        });
-        events = fallback;
-        total = fallback.length;
-      } else {
-        throw queryErr;
-      }
-    }
-
-    res.json({
-      events: events.map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        slug: e.slug || null,
-        date: e.date.toISOString(),
-        startTime: e.startTime || null,
-        endTime: e.endTime || null,
-        venue: e.venue,
-        address: e.address || null,
-        capacity: e.capacity,
-        minAge: e.minAge || null,
-        dressCode: e.dressCode || null,
-        genres: e.genres || null,
-        djLineup: e.djLineup || null,
-        coverImage: e.coverImage || e.bannerUrl,
-        galleryImages: e.galleryImages || null,
-        status: e.status || "DRAFT",
-        description: e.description,
-        reservationCount: e._count?.reservations || 0,
-        hasSheet: false,
-        sheetUrl: null,
-      })),
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
-      },
+    const data = await getEventList({
+      status: typeof status === "string" ? status : undefined,
+      venue: typeof venue === "string" ? venue : undefined,
+      search: typeof search === "string" ? search : undefined,
+      onlyUpcoming: upcoming === "true",
+      page: parseInt(String(page), 10) || 1,
+      limit: parseInt(String(limit), 10) || 50,
     });
+
+    return res.json(data);
   } catch (err: any) {
     return res.status(500).json({
       error: "Internal server error",

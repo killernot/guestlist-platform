@@ -25,6 +25,7 @@ model Event {
   galleryImages String?
   status       EventStatus   @default(DRAFT)
   bannerUrl    String?
+  createdAt    DateTime      @default(now())
   reservations Reservation[]
   sheetsMapping GoogleSheetsMapping?
 

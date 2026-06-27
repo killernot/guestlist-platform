@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Head from "next/head";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth";
+import { getServerSession } from "../../auth";
 import prisma from "../../lib/prism";
 import SheetsManager from "../../components/admin/SheetsManager";
 
@@ -11,7 +10,7 @@ interface Event {
 }
 
 export async function getServerSideProps(context: any) {
-  const session = await getServerSession(context.req, context.res, authOptions);
+  const session = await getServerSession(context.req, context.res);
 
   if (!session) {
     return {
