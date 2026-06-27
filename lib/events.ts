@@ -40,7 +40,7 @@ function mapEvent(e: any): EventListItem {
   return {
     id: e.id,
     name: e.name,
-    slug: e.slug,
+    slug: e.slug || e.name?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "",
     date: e.date.toISOString(),
     startTime: e.startTime || null,
     endTime: e.endTime || null,
@@ -118,23 +118,52 @@ export async function getEventList(options: {
   const pageNum = Math.max(1, page);
   const limitNum = Math.min(100, Math.max(1, limit));
 
-  const [events, total, approvedAgg] = await Promise.all([
-    prisma.event.findMany({
-      where,
-      orderBy: { date: "asc" },
-      skip: (pageNum - 1) * limitNum,
-      take: limitNum,
-      include: {
-        _count: { select: { reservations: true } },
-      },
-    }),
-    prisma.event.count({ where }),
-    prisma.reservation.groupBy({
-      by: ["eventId"],
-      where: { status: "APPROVED" },
-      _sum: { guestCount: true },
-    }),
-  ]);
+  // Try full query; fall back to query without new columns if migration hasn't been applied
+  let events: any[];
+  let total: number;
+  let approvedAgg: any[];
+  try {
+    [events, total, approvedAgg] = await Promise.all([
+      prisma.event.findMany({
+        where,
+        orderBy: { date: "asc" },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        include: {
+          _count: { select: { reservations: true } },
+        },
+      }),
+      prisma.event.count({ where }),
+      prisma.reservation.groupBy({
+        by: ["eventId"],
+        where: { status: "APPROVED" },
+        _sum: { guestCount: true },
+      }),
+    ]);
+  } catch (queryErr: any) {
+    // Fallback: columns may not exist yet (pre-migration state)
+    if (queryErr?.code === "P2022" || queryErr?.message?.includes("Unknown column")) {
+      [events, total, approvedAgg] = await Promise.all([
+        prisma.event.findMany({
+          where,
+          orderBy: { date: "asc" },
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+          include: {
+            _count: { select: { reservations: true } },
+          },
+        }),
+        prisma.event.count({ where }),
+        prisma.reservation.groupBy({
+          by: ["eventId"],
+          where: { status: "APPROVED" },
+          _sum: { guestCount: true },
+        }),
+      ]);
+    } else {
+      throw queryErr;
+    }
+  }
 
   const approvedMap = new Map<string, number>();
   for (const agg of approvedAgg) {
@@ -163,19 +192,36 @@ export async function getEventList(options: {
  * Returns event with accurate approved guest count.
  */
 export async function getEventBySlug(slugOrId: string): Promise<EventDetail | null> {
-  const event = await prisma.event.findFirst({
-    where: {
-      OR: [
-        { slug: slugOrId },
-        { id: slugOrId },
-      ],
-    },
-    include: {
-      sheetsMapping: {
-        select: { spreadsheetId: true, sheetUrl: true, sheetTitle: true },
+  let event: any;
+  try {
+    event = await prisma.event.findFirst({
+      where: {
+        OR: [
+          { slug: slugOrId },
+          { id: slugOrId },
+        ],
       },
-    },
-  });
+      include: {
+        sheetsMapping: {
+          select: { spreadsheetId: true, sheetUrl: true, sheetTitle: true },
+        },
+      },
+    });
+  } catch (queryErr: any) {
+    // Fallback if slug column doesn't exist (pre-migration state)
+    if (queryErr?.code === "P2022" || queryErr?.message?.includes("Unknown column")) {
+      event = await prisma.event.findUnique({
+        where: { id: slugOrId },
+        include: {
+          sheetsMapping: {
+            select: { spreadsheetId: true, sheetUrl: true, sheetTitle: true },
+          },
+        },
+      });
+    } else {
+      throw queryErr;
+    }
+  }
 
   if (!event) return null;
 
