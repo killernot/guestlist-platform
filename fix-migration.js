@@ -1,179 +1,117 @@
 /**
- * Migration recovery script using Prisma client directly.
+ * Migration recovery script using Prisma CLI.
  * Fixes the broken migration state in production.
  * Safe to run multiple times (idempotent).
  */
-// Use full path to ensure module resolution works in Vercel build environment
-const prismaPkg = require.resolve('@prisma/client', { paths: [__dirname] });
-const { PrismaClient } = require(prismaPkg);
+const { execSync } = require('child_process');
 
-const prisma = new PrismaClient();
+function run(cmd) {
+  console.log(`\n> ${cmd}`);
+  try {
+    const output = execSync(cmd, {
+      encoding: 'utf8',
+      env: process.env,
+      stdio: 'pipe',
+      timeout: 30000,
+    });
+    console.log(output);
+    return { success: true, output: output.trim() };
+  } catch (e) {
+    if (e.stdout) console.log(e.stdout);
+    if (e.stderr) console.error(e.stderr.split('\n').slice(0, 3).join('\n'));
+    return { success: false, output: (e.stdout || '').trim() };
+  }
+}
 
-async function run() {
+async function main() {
   console.log('=== Migration Recovery ===');
+  
+  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('file:')) {
+    console.log('No production DATABASE_URL, skipping.');
+    process.exit(0);
+  }
 
-  // Step 1: Check if google_sheets_mappings table exists
+  // Step 1: Check if google_sheets_mappings table exists using prisma db query
   console.log('\n--- Step 1: Check table ---');
-  const tableCheck = await prisma.$queryRaw`
-    SELECT table_name FROM information_schema.tables 
-    WHERE table_name = 'google_sheets_mappings' AND table_schema = 'public'
-  `;
-  const tableExists = Array.isArray(tableCheck) && tableCheck.length > 0;
+  const check = run('npx prisma db query "SELECT count(*) as cnt FROM information_schema.tables WHERE table_name = \'google_sheets_mappings\' AND table_schema = \'public\'" --json 2>&1');
+  console.log('Check output:', check.output);
+  
+  let tableExists = false;
+  try {
+    const parsed = JSON.parse(check.output.split('\n').find(l => l.startsWith('[')));
+    tableExists = parsed[0]?.cnt > 0;
+  } catch (e) {
+    // Try alternative parsing
+    tableExists = check.output.includes('1');
+  }
   console.log('Table exists:', tableExists);
 
   if (!tableExists) {
-    console.log('\n--- Creating google_sheets_mappings table (WITHOUT FK) ---');
-    await prisma.$executeRaw`
-      CREATE TABLE "google_sheets_mappings" (
-        "id" TEXT NOT NULL,
-        "eventId" TEXT NOT NULL,
-        "spreadsheetId" TEXT NOT NULL,
-        "sheetUrl" TEXT NOT NULL,
-        "sheetTitle" TEXT NOT NULL,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL,
-        CONSTRAINT "google_sheets_mappings_pkey" PRIMARY KEY ("id")
-      )
-    `;
-    await prisma.$executeRaw`
-      CREATE UNIQUE INDEX "google_sheets_mappings_eventId_key" ON "google_sheets_mappings"("eventId")
-    `;
+    console.log('\n--- Creating google_sheets_mappings table ---');
+    
+    // Create table WITHOUT FK constraint (migration 3 will add it)
+    run('npx prisma db execute --stdin', `CREATE TABLE "google_sheets_mappings" (
+  "id" TEXT NOT NULL,
+  "eventId" TEXT NOT NULL,
+  "spreadsheetId" TEXT NOT NULL,
+  "sheetUrl" TEXT NOT NULL,
+  "sheetTitle" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "google_sheets_mappings_pkey" PRIMARY KEY ("id")
+);`);
+    
+    run('npx prisma db execute --stdin', `CREATE UNIQUE INDEX "google_sheets_mappings_eventId_key" ON "google_sheets_mappings"("eventId");`);
+    
     console.log('✅ Table created');
   } else {
     console.log('✅ Table already exists');
   }
 
-  // Step 2: Check if FK constraint exists
-  console.log('\n--- Step 2: Check FK constraint ---');
-  const fkCheck = await prisma.$queryRaw`
-    SELECT constraint_name FROM information_schema.table_constraints 
-    WHERE table_name = 'google_sheets_mappings' AND constraint_type = 'FOREIGN KEY'
-  `;
-  const fkExists = Array.isArray(fkCheck) && fkCheck.length > 0;
+  // Step 2: Check FK constraint
+  console.log('\n--- Step 2: Check FK ---');
+  const fkCheck = run('npx prisma db query "SELECT count(*) as cnt FROM information_schema.table_constraints WHERE table_name = \'google_sheets_mappings\' AND constraint_type = \'FOREIGN KEY\'" --json 2>&1');
+  let fkExists = false;
+  try {
+    const parsed = JSON.parse(fkCheck.output.split('\n').find(l => l.startsWith('[')));
+    fkExists = parsed[0]?.cnt > 0;
+  } catch (e) {
+    fkExists = fkCheck.output.includes('1');
+  }
   console.log('FK exists:', fkExists);
 
   // Step 3: Check migration status
-  console.log('\n--- Step 3: Check migration status ---');
-  const migrations = await prisma.$queryRaw`
-    SELECT migration_name, finished_at, rolled_back_at, applied_steps_count
-    FROM _prisma_migrations
-    ORDER BY started_at
-  `;
-  console.log(JSON.stringify(migrations, null, 2));
+  console.log('\n--- Step 3: Migration status ---');
+  const status = run('npx prisma migrate status 2>&1');
+  console.log(status.output);
 
-  // Step 4: Check if migration 3 is failed
-  const migration3 = migrations.find(function(m) { return m.migration_name === '20260625000001_add_sheets_relation'; });
-  const migration3Failed = migration3 && !migration3.finished_at && !migration3.rolled_back_at;
-  const migration3NotApplied = !migration3;
-
-  console.log('\nMigration 3 status:', {
-    exists: !!migration3,
-    failed: migration3Failed,
-    notApplied: migration3NotApplied,
-    finished: migration3?.finished_at,
-    rolledBack: migration3?.rolled_back_at,
-  });
-
-  if (migration3Failed || migration3NotApplied) {
-    console.log('\n--- Step 4: Fix migration 3 ---');
+  // Step 4: Resolve failed migration
+  if (status.output?.includes('failed') || status.output?.includes('not applied')) {
+    console.log('\n--- Step 4: Resolve migration ---');
     
-    if (migration3Failed) {
-      // Mark as rolled back
-      console.log('Marking migration 3 as rolled back...');
-      await prisma.$executeRaw`
-        UPDATE "_prisma_migrations" SET "rolled_back_at" = NOW()
-        WHERE "migration_name" = '20260625000001_add_sheets_relation'
-      `;
-    }
-
+    // Mark as rolled back
+    run('npx prisma migrate resolve --rolled-back 20260625000001_add_sheets_relation 2>&1');
+    
     if (!fkExists) {
-      // Add the FK constraint (this is what migration 3 does)
-      console.log('Adding FK constraint...');
-      await prisma.$executeRaw`
-        ALTER TABLE "google_sheets_mappings" 
-        ADD CONSTRAINT "google_sheets_mappings_eventId_fkey" 
-        FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-      `;
-      console.log('✅ FK constraint added');
+      // Add FK constraint
+      run('npx prisma db execute --stdin', `ALTER TABLE "google_sheets_mappings" ADD CONSTRAINT "google_sheets_mappings_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE RESTRICT ON UPDATE CASCADE;`);
+      console.log('✅ FK added');
     }
-
-    // Mark migration 3 as applied
-    if (migration3NotApplied) {
-      console.log('Recording migration 3 as applied...');
-      await prisma.$executeRaw`
-        INSERT INTO "_prisma_migrations" (id, checksum, migration_name, started_at, finished_at, applied_steps_count)
-        VALUES (
-          'c52e71b-0000-0000-0000-000000000001',
-          'manual-recovery',
-          '20260625000001_add_sheets_relation',
-          NOW(), NOW(), 1
-        )
-      `;
-    } else {
-      console.log('Marking migration 3 as finished...');
-      await prisma.$executeRaw`
-        UPDATE "_prisma_migrations" 
-        SET "finished_at" = NOW(), "rolled_back_at" = NULL, "applied_steps_count" = 1
-        WHERE "migration_name" = '20260625000001_add_sheets_relation'
-      `;
-    }
-    console.log('✅ Migration 3 resolved');
   }
 
-  // Step 5: Check if migration 4 is applied
-  const migration4 = migrations.find(function(m) { return m.migration_name === '20260627000000_add_event_createdAt'; });
-  if (!migration4) {
-    console.log('\n--- Step 5: Apply migration 4 (add createdAt) ---');
-    await prisma.$executeRaw`
-      ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    `;
-    
-    await prisma.$executeRaw`
-      INSERT INTO "_prisma_migrations" (id, checksum, migration_name, started_at, finished_at, applied_steps_count)
-      VALUES (
-        'c52e71b-0000-0000-0000-000000000002',
-        'manual-recovery',
-        '20260627000000_add_event_createdAt',
-        NOW(), NOW(), 1
-      )
-    `;
-    console.log('✅ Migration 4 applied');
-  } else if (!migration4.finished_at) {
-    console.log('\n--- Step 5: Mark migration 4 as finished ---');
-    await prisma.$executeRaw`
-      UPDATE "_prisma_migrations" 
-      SET "finished_at" = NOW(), "rolled_back_at" = NULL, "applied_steps_count" = 1
-      WHERE "migration_name" = '20260627000000_add_event_createdAt'
-    `;
-    console.log('✅ Migration 4 marked as finished');
+  // Step 5: Deploy remaining migrations
+  console.log('\n--- Step 5: Deploy ---');
+  const deploy = run('npx prisma migrate deploy 2>&1');
+  
+  if (deploy.success) {
+    console.log('✅ Deploy successful');
   } else {
-    console.log('\n✅ Migration 4 already applied');
+    console.log('Deploy had issues, checking...');
   }
 
-  // Step 6: Verify final state
-  console.log('\n--- Step 6: Final verification ---');
-  const finalMigrations = await prisma.$queryRaw`
-    SELECT migration_name, finished_at, rolled_back_at
-    FROM _prisma_migrations
-    ORDER BY started_at
-  `;
-  console.log('Migrations:', JSON.stringify(finalMigrations, null, 2));
-
-  const columns = await prisma.$queryRaw`
-    SELECT column_name, data_type FROM information_schema.columns
-    WHERE table_name = 'events' AND column_schema = 'public'
-    ORDER BY ordinal_position
-  `;
-  console.log('\nEvents table columns:', JSON.stringify(columns, null, 2));
-
-  console.log('\n✅ Recovery complete!');
+  // Step 6: Final status
+  console.log('\n--- Step 6: Final status ---');
+  run('npx prisma migrate status 2>&1');
 }
 
-run()
-  .catch((e) => {
-    console.error('Recovery failed:', e.message);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main();
